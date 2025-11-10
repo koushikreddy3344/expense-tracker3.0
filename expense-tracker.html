@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Monthly Expense Tracker</title>
+
+  <!-- Simple, clean styling (no external build required) -->
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#9aa4b2; --accent:#7dd3fc; --accent-2:#60a5fa;
+      --glass: rgba(255,255,255,0.03);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; background:linear-gradient(180deg,#081025 0%, #071122 100%); color:#e6eef6; min-height:100vh; padding:28px;}
+    .container{max-width:1100px;margin:0 auto}
+    header{display:flex;gap:16px;align-items:center; margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    .sub{color:var(--muted); font-size:13px}
+    .grid{display:grid; gap:14px}
+    .wide{grid-template-columns: 1fr 360px; align-items:start}
+    .card{background:var(--card); padding:14px;border-radius:12px; box-shadow: 0 6px 18px rgba(2,6,23,0.6);}
+    label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px}
+    input[type="text"], input[type="number"], input[type="date"], select{
+      width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04);
+      background:var(--glass); color:inherit; outline:none; font-size:14px;
+    }
+    .row{display:flex; gap:10px}
+    .row > *{flex:1}
+    button{background:linear-gradient(90deg,var(--accent),var(--accent-2)); border:none; color:#042433; font-weight:600;
+      padding:10px 12px; border-radius:10px; cursor:pointer;}
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06); color:var(--muted); font-weight:600}
+    .cat-pill{display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.03);font-size:13px;margin-right:6px}
+    .totals{display:flex;flex-direction:column; gap:8px}
+    .tot-row{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+    table{width:100%; border-collapse:collapse; margin-top:10px; font-size:14px}
+    th, td{padding:8px; text-align:left; border-bottom:1px dashed rgba(255,255,255,0.03)}
+    .muted{color:var(--muted); font-size:13px}
+    .small{font-size:12px}
+    .actions button{margin-right:6px}
+    .controls{display:flex;gap:8px; align-items:center}
+    .footer-note{color:var(--muted); font-size:12px; margin-top:10px}
+    @media (max-width:900px){
+      .wide{grid-template-columns: 1fr; }
+      header{flex-direction:column;align-items:flex-start; gap:6px}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Expense Tracker — Monthly totals by category</h1>
+        <div class="sub">Add expenses, pick a month, and see category-wise totals. Data saved locally.</div>
+      </div>
+      <div style="margin-left:auto" class="controls">
+        <button id="exportCsv" title="Export visible data as CSV">Export CSV</button>
+        <button id="clearAll" class="ghost" title="Clear all saved expenses">Clear All</button>
+      </div>
+    </header>
+
+    <main class="grid wide">
+      <!-- left: add expense + list -->
+      <section class="card">
+        <h3 style="margin:0 0 10px 0">Add an expense</h3>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <div style="flex:1;min-width:160px">
+            <label for="date">Date</label>
+            <input type="date" id="date" />
+          </div>
+          <div style="flex:1;min-width:160px">
+            <label for="amount">Amount (₹)</label>
+            <input type="number" id="amount" min="0" step="0.01" placeholder="e.g. 250.00" />
+          </div>
+          <div style="flex:1;min-width:200px">
+            <label for="category">Category</label>
+            <select id="category">
+              <option value="Food">Food</option>
+              <option value="Travel">Travel</option>
+              <option value="Rent">Rent</option>
+              <option value="Utilities">Utilities</option>
+              <option value="Entertainment">Entertainment</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom:10px">
+          <label for="desc">Description (optional)</label>
+          <input type="text" id="desc" placeholder="e.g. lunch, metro, electricity" />
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <button id="addBtn">Add Expense</button>
+          <button id="addQuickBtn" class="ghost">Quick Add ₹100 Food</button>
+        </div>
+
+        <hr style="margin:12px 0; border:none; height:1px; background:rgba(255,255,255,0.03)" />
+
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <label for="monthPicker" class="muted">See totals for</label><br/>
+            <input type="month" id="monthPicker" />
+          </div>
+          <div style="text-align:right">
+            <div class="muted small">Total this month</div>
+            <div id="monthTotal" style="font-size:20px;font-weight:700">₹0.00</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <h4 style="margin:0 0 8px 0">Expenses list</h4>
+          <div id="listContainer" style="max-height:320px; overflow:auto">
+            <table id="expTable">
+              <thead>
+                <tr><th>Date</th><th>Category</th><th>Desc</th><th>Amount</th><th></th></tr>
+              </thead>
+              <tbody id="expBody">
+                <!-- rows inserted here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- right: totals by category -->
+      <aside class="card">
+        <h3 style="margin:0 0 10px 0">Category breakdown</h3>
+        <div class="totals" id="categoryTotals">
+          <!-- dynamically inserted -->
+        </div>
+
+        <div style="margin-top:12px">
+          <h4 style="margin:0 0 8px 0">Quick tools</h4>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button id="showThisMonth" class="ghost">Jump to current month</button>
+            <button id="removeMonth" class="ghost">Delete all items in selected month</button>
+            <div class="footer-note">Tip: You can edit or delete any expense from the list. Values are in ₹ and stored locally on this browser.</div>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    // Expense Tracker JS
+    // Data model: array of {id, date (YYYY-MM-DD), amount (number), category, desc}
+    const STORAGE_KEY = 'expense_tracker_v1';
+    const defaultCategories = ['Food','Travel','Rent','Utilities','Entertainment','Other'];
+
+    // DOM refs
+    const dateInput = document.getElementById('date');
+    const amountInput = document.getElementById('amount');
+    const categoryInput = document.getElementById('category');
+    const descInput = document.getElementById('desc');
+    const addBtn = document.getElementById('addBtn');
+    const addQuickBtn = document.getElementById('addQuickBtn');
+    const monthPicker = document.getElementById('monthPicker');
+    const expBody = document.getElementById('expBody');
+    const monthTotalEl = document.getElementById('monthTotal');
+    const categoryTotalsEl = document.getElementById('categoryTotals');
+    const exportCsvBtn = document.getElementById('exportCsv');
+    const clearAllBtn = document.getElementById('clearAll');
+    const showThisMonthBtn = document.getElementById('showThisMonth');
+    const removeMonthBtn = document.getElementById('removeMonth');
+
+    // utilities
+    const $ = sel => document.querySelector(sel);
+
+    function loadData(){
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(!raw) return [];
+        return JSON.parse(raw);
+      } catch(e){
+        console.error('Failed load', e);
+        return [];
+      }
+    }
+    function saveData(arr){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+    }
+    function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+    // initialize monthPicker with current month
+    (function initMonth(){
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth()+1).padStart(2,'0');
+      monthPicker.value = `${y}-${m}`;
+      // default date input to today
+      dateInput.value = now.toISOString().slice(0,10);
+    })();
+
+    // main render flow
+    function getFilteredItems(items){
+      // returns items matching selected month (YYYY-MM)
+      const sel = monthPicker.value; // "YYYY-MM"
+      if(!sel) return items;
+      return items.filter(it => it.date.slice(0,7) === sel);
+    }
+
+    function formatCurrency(num){
+      // returns "₹X,XXX.YY"
+      const n = Number(num) || 0;
+      // manual formatting to avoid localization surprises
+      const sign = n < 0 ? '-' : '';
+      const abs = Math.abs(n).toFixed(2);
+      const parts = abs.split('.');
+      const intPart = parts[0];
+      const dec = parts[1];
+      const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      return `${sign}₹${withCommas}.${dec}`;
+    }
+
+    function render(){
+      const items = loadData();
+      const sel = monthPicker.value;
+      const filtered = getFilteredItems(items).sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+
+      // render list
+      expBody.innerHTML = '';
+      if(filtered.length===0){
+        expBody.innerHTML = `<tr><td colspan="5" class="muted small">No expenses for ${sel || 'selected month'}.</td></tr>`;
+      } else {
+        for(const it of filtered){
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="small">${it.date}</td>
+            <td class="small">${escapeHtml(it.category)}</td>
+            <td class="small">${escapeHtml(it.desc || '')}</td>
+            <td class="small" style="font-weight:600">${formatCurrency(it.amount)}</td>
+            <td class="small actions">
+              <button data-id="${it.id}" class="editBtn ghost">Edit</button>
+              <button data-id="${it.id}" class="delBtn ghost">Delete</button>
+            </td>
+          `;
+          expBody.appendChild(tr);
+        }
+      }
+
+      // totals
+      const totals = {};
+      let monthTotal = 0;
+      for(const c of defaultCategories) totals[c]=0;
+      for(const it of filtered){
+        const a = Number(it.amount) || 0;
+        monthTotal += a;
+        if(!(it.category in totals)) totals[it.category] = 0;
+        totals[it.category] += a;
+      }
+
+      monthTotalEl.textContent = formatCurrency(monthTotal);
+
+      // render category totals (show categories with non-zero first, then zeros)
+      categoryTotalsEl.innerHTML = '';
+      const sortedCats = Object.keys(totals).sort((a,b)=> totals[b]-totals[a]);
+      for(const cat of sortedCats){
+        const row = document.createElement('div');
+        row.className = 'tot-row';
+        row.innerHTML = `<div><div style="font-weight:700">${escapeHtml(cat)}</div><div class="muted small">items: ${filtered.filter(x=>x.category===cat).length}</div></div>
+                         <div style="font-weight:700">${formatCurrency(totals[cat])}</div>`;
+        categoryTotalsEl.appendChild(row);
+      }
+
+      // attach handlers for edit/delete
+      document.querySelectorAll('.delBtn').forEach(btn=>{
+        btn.addEventListener('click', e=>{
+          const id = e.currentTarget.dataset.id;
+          deleteItem(id);
+        });
+      });
+      document.querySelectorAll('.editBtn').forEach(btn=>{
+        btn.addEventListener('click', e=>{
+          const id = e.currentTarget.dataset.id;
+          startEditItem(id);
+        });
+      });
+    }
+
+    function escapeHtml(s){
+      if(!s) return '';
+      return String(s).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
+    }
+
+    // add new item
+    addBtn.addEventListener('click', ()=>{
+      const date = dateInput.value;
+      const amount = parseFloat(amountInput.value);
+      const category = categoryInput.value;
+      const desc = descInput.value.trim();
+
+      if(!date){
+        alert('Please pick a date.');
+        return;
+      }
+      if(isNaN(amount) || amount <= 0){
+        alert('Please enter an amount > 0.');
+        return;
+      }
+
+      const items = loadData();
+      const newItem = {
+        id: uid(),
+        date,
+        amount: Number(amount.toFixed(2)),
+        category,
+        desc
+      };
+      items.push(newItem);
+      saveData(items);
+
+      // reset some inputs but keep date same for quick entry
+      amountInput.value = '';
+      descInput.value = '';
+      render();
+    });
+
+    addQuickBtn.addEventListener('click', ()=>{
+      // quick sample insert for convenience
+      const today = new Date().toISOString().slice(0,10);
+      const items = loadData();
+      items.push({id:uid(), date:today, amount:100, category:'Food', desc:'Quick Add'});
+      saveData(items);
+      render();
+    });
+
+    function deleteItem(id){
+      if(!confirm('Delete this expense?')) return;
+      let items = loadData();
+      items = items.filter(it=> it.id !== id);
+      saveData(items);
+      render();
+    }
+
+    function startEditItem(id){
+      const items = loadData();
+      const it = items.find(x=> x.id === id);
+      if(!it){ alert('Item not found'); return; }
+
+      // populate inputs with the item values
+      dateInput.value = it.date;
+      amountInput.value = it.amount;
+      categoryInput.value = it.category;
+      descInput.value = it.desc || '';
+
+      // change add button to "Save"
+      addBtn.textContent = 'Save Changes';
+      addBtn.dataset.editId = id;
+    }
+
+    // saving edits
+    addBtn.addEventListener('click', (ev)=>{
+      const editId = addBtn.dataset.editId;
+      if(!editId) return; // normal add handled earlier
+
+      const date = dateInput.value;
+      const amount = parseFloat(amountInput.value);
+      const category = categoryInput.value;
+      const desc = descInput.value.trim();
+      if(!date){ alert('Please pick a date.'); return; }
+      if(isNaN(amount) || amount <= 0){ alert('Please enter an amount > 0.'); return; }
+
+      const items = loadData();
+      const idx = items.findIndex(x=> x.id === editId);
+      if(idx === -1){ alert('Item not found'); return; }
+      items[idx].date = date;
+      items[idx].amount = Number(amount.toFixed(2));
+      items[idx].category = category;
+      items[idx].desc = desc;
+
+      saveData(items);
+
+      // restore add button
+      addBtn.textContent = 'Add Expense';
+      delete addBtn.dataset.editId;
+
+      // clear inputs
+      amountInput.value = '';
+      descInput.value = '';
+      // leave date as-is
+      render();
+    });
+
+    // handling month picker changes
+    monthPicker.addEventListener('change', render);
+
+    // export CSV of filtered items
+    exportCsvBtn.addEventListener('click', ()=>{
+      const items = getFilteredItems(loadData());
+      if(items.length === 0){ alert('No items to export for the selected month.'); return; }
+
+      // build CSV
+      const rows = [['Date','Category','Description','Amount']];
+      for(const it of items){
+        rows.push([it.date, it.category, (it.desc || ''), it.amount.toFixed(2)]);
+      }
+      const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const sel = monthPicker.value || new Date().toISOString().slice(0,7);
+      a.download = `expenses_${sel}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // clear all
+    clearAllBtn.addEventListener('click', ()=>{
+      if(!confirm('Clear all saved expenses permanently?')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      render();
+    });
+
+    // jump to current month
+    showThisMonthBtn.addEventListener('click', ()=>{
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth()+1).padStart(2,'0');
+      monthPicker.value = `${y}-${m}`;
+      render();
+    });
+
+    // remove all items in selected month
+    removeMonthBtn.addEventListener('click', ()=>{
+      const sel = monthPicker.value;
+      if(!sel){ alert('Pick a month first.'); return; }
+      if(!confirm(`Delete ALL expenses in ${sel}? This cannot be undone.`)) return;
+      let items = loadData();
+      items = items.filter(it=> it.date.slice(0,7) !== sel);
+      saveData(items);
+      render();
+    });
+
+    // initial render and keep date consistent when editing
+    render();
+
+    // small enhancement: handle Enter key in amount or desc to add quickly (if not editing)
+    [amountInput, descInput].forEach(el=>{
+      el.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter' && !addBtn.dataset.editId){
+          e.preventDefault();
+          addBtn.click();
+        }
+      });
+    });
+
+    // ensure monthPicker always set (fallback)
+    if(!monthPicker.value){
+      const now = new Date();
+      monthPicker.value = now.toISOString().slice(0,7);
+    }
+
+  </script>
+</body>
+</html>
